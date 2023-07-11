@@ -8,15 +8,22 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"regexp"
 	"time"
 )
 
 type Webhook struct {
-	AccessToken string
-	Secret      string
+	url    string
+	secret string
+}
+
+func NewWebhook(webhook, secret string) *Webhook {
+	return &Webhook{
+		url:    webhook,
+		secret: secret,
+	}
 }
 
 type response struct {
@@ -24,7 +31,8 @@ type response struct {
 	Msg  string `json:"errmsg"`
 }
 
-//SendMessageText Function to send message
+// SendMessageText Function to send message
+//
 //goland:noinspection GoUnhandledErrorResult
 func (t *Webhook) SendMessageText(text string, at ...string) error {
 	msg := map[string]interface{}{
@@ -74,11 +82,10 @@ func (t *Webhook) SendMessageText(text string, at ...string) error {
 	}
 
 	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}
-
 	var r response
 	err = json.Unmarshal(body, &r)
 	if err != nil {
@@ -92,7 +99,7 @@ func (t *Webhook) SendMessageText(text string, at ...string) error {
 
 //goland:noinspection GoUnhandledErrorResult
 func (t *Webhook) sendMessageMarkdown(title, text string, at ...string) error {
-	msg := map[string]interface{}{
+	msg := map[string]any{
 		"msgtype": "markdown",
 		"markdown": map[string]string{
 			"title": title,
@@ -139,7 +146,7 @@ func (t *Webhook) sendMessageMarkdown(title, text string, at ...string) error {
 		return err
 	}
 	defer resp.Body.Close()
-	_, err = ioutil.ReadAll(resp.Body)
+	_, err = io.ReadAll(resp.Body)
 	return err
 }
 
@@ -150,10 +157,10 @@ func (t *Webhook) hmacSha256(stringToSign string, secret string) string {
 }
 
 func (t *Webhook) getURL() string {
-	wh := "https://oapi.dingtalk.com/robot/send?access_token=" + t.AccessToken
+	wh := t.url
 	timestamp := time.Now().UnixNano() / 1e6
-	stringToSign := fmt.Sprintf("%d\n%s", timestamp, t.Secret)
-	sign := t.hmacSha256(stringToSign, t.Secret)
+	stringToSign := fmt.Sprintf("%d\n%s", timestamp, t.secret)
+	sign := t.hmacSha256(stringToSign, t.secret)
 	url := fmt.Sprintf("%s&timestamp=%d&sign=%s", wh, timestamp, sign)
 	return url
 }
